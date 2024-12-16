@@ -8,9 +8,28 @@ public static class Injector
     private readonly static Dictionary<Type, IEnumerable<PropertyInfo>> BuilderCache = [];
     private readonly static Dictionary<Type, object> Instances = [];
 
-    public static void Activate<T>()
+    public static void ActivateAll()
     {
-        var types = Assembly.GetAssembly(typeof(T))?.GetTypes().Where(e => e.GetCustomAttribute<InjectorConfigurationAttribute>() is not null);
+        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) { 
+            Activate(assembly);
+        }
+    }
+
+    public static void ActivateAssemblyBuilder()
+    {
+        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()
+            .Where(e => e.GetCustomAttribute<AssemblyBuilderAttribute>() is not null))
+        {
+            Activate(assembly);
+        }
+    }
+
+    public static void Activate<T>() 
+        => Activate(Assembly.GetAssembly(typeof(T))!);
+
+    public static void Activate(Assembly assembly)
+    {
+        var types = assembly.GetTypes().Where(e => e.GetCustomAttribute<InjectorConfigurationAttribute>() is not null);
         if (types is null) return;
 
         foreach (Type configuration in types)
@@ -29,36 +48,16 @@ public static class Injector
 
         #region Singleton
 
-        var singletonTypes = Assembly.GetAssembly(typeof(T))?.GetTypes().Where(e => e.GetCustomAttribute<SingletonAttribute>() is not null);
+        var singletonTypes = assembly.GetTypes().Where(e => e.GetCustomAttribute<SingletonAttribute>() is not null);
         if (singletonTypes is null) return;
 
-        foreach (Type singletonType in singletonTypes) {
+        foreach (Type singletonType in singletonTypes)
+        {
             Register(singletonType, Lifecycle.Singleton);
         }
 
         #endregion
-    }
-
-    private static void InjectField(PropertyInfo propertyInfo, object target)
-    {
-        if (Instances.TryGetValue(propertyInfo.PropertyType, out object? instance)) {
-            ArgumentNullException.ThrowIfNull(instance);
-            propertyInfo.SetValue(target, instance);
-            return;
-        }
-
-        if (Injects.TryGetValue(propertyInfo.PropertyType, out Inject inject))
-        {
-            inject.Build(propertyInfo, target);
-            return;
-        }
-
-        object? value = Activator.CreateInstance(propertyInfo.PropertyType);
-        ArgumentNullException.ThrowIfNull(value);
-
-        ActivateInstance(value);
-        propertyInfo.SetValue(target, value);
-    }
+    } 
 
     public static void Register<T>(Lifecycle lifecycle) => Register(typeof(T), lifecycle);
 
@@ -121,6 +120,28 @@ public static class Injector
         {
             InjectField(property, instance);
         }
+    }
+
+    private static void InjectField(PropertyInfo propertyInfo, object target)
+    {
+        if (Instances.TryGetValue(propertyInfo.PropertyType, out object? instance))
+        {
+            ArgumentNullException.ThrowIfNull(instance);
+            propertyInfo.SetValue(target, instance);
+            return;
+        }
+
+        if (Injects.TryGetValue(propertyInfo.PropertyType, out Inject inject))
+        {
+            inject.Build(propertyInfo, target);
+            return;
+        }
+
+        object? value = Activator.CreateInstance(propertyInfo.PropertyType);
+        ArgumentNullException.ThrowIfNull(value);
+
+        ActivateInstance(value);
+        propertyInfo.SetValue(target, value);
     }
 
     private struct Inject

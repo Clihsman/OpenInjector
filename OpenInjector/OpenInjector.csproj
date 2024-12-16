@@ -7,7 +7,7 @@
     <Title>OpenInjector</Title>
     <Company>Opendev.org</Company>
     <Authors>Clisman Isaac Iscala Salas</Authors>
-    <Version>0.0.0.5</Version>
+    <Version>0.0.0.6</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description> A lightweight library for automatic dependency injection in C#. Simplifies service registration and resolution, promoting clean and scalable development.</Description>
   </PropertyGroup>

@@ -72,6 +72,7 @@ class Service : ServiceB
 class ConfigurationServiceC
 {
     static int instances = 0;
+
     [Builder]
     private ServiceB ServiceB()
     {
