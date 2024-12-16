@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Title>OpenInjector</Title>
+    <Company>Opendev.org</Company>
+    <Authors>Clisman Isaac Iscala Salas</Authors>
+    <Version>0.0.0.1</Version>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Description> A lightweight library for automatic dependency injection in C#. Simplifies service registration and resolution, promoting clean and scalable development.</Description>
+  </PropertyGroup>
+
+</Project>
