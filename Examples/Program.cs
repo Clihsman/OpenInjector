@@ -73,10 +73,10 @@ class ConfigurationServiceC
 {
     static int instances = 0;
 
-    [Builder]
-    private ServiceB ServiceB()
+    [Builder(requiredAttribute: typeof(SingletonAttribute))]
+    private T ServiceB<T>()
     {
         Console.WriteLine(instances++);
-        return new Service();
+        return (T)(ServiceB)(object)new Service();
     }
 }

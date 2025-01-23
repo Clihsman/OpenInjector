@@ -3,11 +3,14 @@
 [AttributeUsage(AttributeTargets.Method)]
 public class BuilderAttribute : Attribute
 {
-    public Attribute? RequiredAttribute { get; private set; }
+    public Type? RequiredAttribute { get; private set; }
 
     public BuilderAttribute() { }
 
-    public BuilderAttribute(Attribute? requiredAttribute) {
+    public BuilderAttribute(Type? requiredAttribute) {
+        if (requiredAttribute?.BaseType != typeof(Attribute))
+            throw new NotSupportedException();
+
         RequiredAttribute = requiredAttribute;
     }
 }

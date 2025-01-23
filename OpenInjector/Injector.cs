@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Collections.Generic;
+using System.Reflection;
 
 namespace OpenInjector;
 
@@ -8,23 +9,7 @@ public static class Injector
     private readonly static Dictionary<Type, IEnumerable<PropertyInfo>> BuilderCache = [];
     private readonly static Dictionary<Type, object> Instances = [];
 
-    public static void ActivateAll()
-    {
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) { 
-            Activate(assembly);
-        }
-    }
-
-    public static void ActivateAssemblyBuilder()
-    {
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()
-            .Where(e => e.GetCustomAttribute<AssemblyBuilderAttribute>() is not null))
-        {
-            Activate(assembly);
-        }
-    }
-
-    public static void Activate<T>() 
+    public static void Activate<T>()
         => Activate(Assembly.GetAssembly(typeof(T))!);
 
     public static void Activate(Assembly assembly)
@@ -41,6 +26,16 @@ public static class Injector
 
             foreach (MethodInfo method in nethods)
             {
+                if (method.IsGenericMethod)
+                {
+                    var builderAttribute = method.GetCustomAttribute<BuilderAttribute>()!;
+
+                    if (!Injects.TryAdd(builderAttribute.RequiredAttribute!, new Inject { Instance = instace, MethodInfo = method, RequiredAttribute = builderAttribute.RequiredAttribute }))
+                        throw new InvalidOperationException($"A builder for the type '{method.ReturnType.FullName}' is already registered.");
+
+                    continue;
+                }
+
                 if (!Injects.TryAdd(method.ReturnType, new Inject { Instance = instace, MethodInfo = method }))
                     throw new InvalidOperationException($"A builder for the type '{method.ReturnType.FullName}' is already registered.");
             }
@@ -57,7 +52,7 @@ public static class Injector
         }
 
         #endregion
-    } 
+    }
 
     public static void Register<T>(Lifecycle lifecycle) => Register(typeof(T), lifecycle);
 
@@ -65,7 +60,8 @@ public static class Injector
     {
         if (lifecycle == Lifecycle.Singleton)
         {
-            if (Instances.ContainsKey(type)) {
+            if (Instances.ContainsKey(type))
+            {
                 throw new InvalidOperationException("ServiceA is already registered as Singleton.");
             }
 
@@ -76,6 +72,20 @@ public static class Injector
                 ActivateInstance(value);
                 Instances.Add(type, value);
                 return;
+            }
+
+            foreach (Attribute attribute in type.GetCustomAttributes()) {             
+                if (Injects.TryGetValue(attribute.GetType(), out Inject injectGeneric))
+                {
+                    MethodInfo methodGeneric = injectGeneric.MethodInfo.MakeGenericMethod(type);
+
+                    object? value = methodGeneric.Invoke(injectGeneric.Instance, null);
+                    ArgumentNullException.ThrowIfNull(value);
+                    ActivateInstance(value);
+                    Instances.Add(type, value);
+                    return;
+                }
+                
             }
 
             object? instance = Activator.CreateInstance(type);
@@ -137,6 +147,24 @@ public static class Injector
             return;
         }
 
+        foreach (Attribute attribute in propertyInfo.GetCustomAttributes())
+        {
+            if (Injects.TryGetValue(attribute.GetType(), out Inject injectGeneric))
+            {
+                MethodInfo methodGeneric = injectGeneric.MethodInfo.MakeGenericMethod(propertyInfo.PropertyType);
+
+                ArgumentNullException.ThrowIfNull(target);
+
+                object? valueGeneric = methodGeneric.Invoke(injectGeneric.Instance, null);
+                ArgumentNullException.ThrowIfNull(valueGeneric);
+
+                ActivateInstance(valueGeneric);
+                propertyInfo.SetValue(target, valueGeneric);
+                return;
+            }
+
+        }
+
         object? value = Activator.CreateInstance(propertyInfo.PropertyType);
         ArgumentNullException.ThrowIfNull(value);
 
@@ -148,6 +176,7 @@ public static class Injector
     {
         public object? Instance { get; set; }
         public MethodInfo MethodInfo { get; set; }
+        public Type? RequiredAttribute { get; set; }
 
         public readonly void Build(PropertyInfo propertyInfo, object? target)
         {
